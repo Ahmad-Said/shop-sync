@@ -58,6 +58,8 @@ Backend migrations in `backend/src/db/migrations` are applied automatically on s
 | ← Client | `item_added` | Item object |
 | ← Client | `item_updated` | Item object |
 | ← Client | `item_deleted` | `{ id, event_id }` |
+| ← Client | `event_updated` | Event summary object |
+| ← Client | `event_deleted` | `{ id }` |
 | ← Client | `presence_update` | `Member[]` |
 
 ## Development without Docker

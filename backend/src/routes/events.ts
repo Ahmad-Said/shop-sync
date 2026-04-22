@@ -1,8 +1,28 @@
 import { Router, Response } from 'express';
+import { Server } from 'socket.io';
 import { pool } from '../db/pool.js';
 import { requireAuth, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
+
+function getIO(req: AuthRequest): Server | null {
+  return (req as any).io || null;
+}
+
+async function emitToEventMembers(io: Server | null, eventId: string, event: string, payload: unknown) {
+  if (!io) return;
+
+  io.to(eventId).emit(event, payload);
+
+  const { rows } = await pool.query(
+    'SELECT user_id FROM event_members WHERE event_id = $1',
+    [eventId]
+  );
+
+  for (const row of rows) {
+    io.to(row.user_id).emit(event, payload);
+  }
+}
 
 function generateInviteCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -184,12 +204,15 @@ router.patch('/:id', requireAuth, async (req: AuthRequest, res: Response): Promi
       [event.id]
     );
 
-    res.json({
+    const payload = {
       ...event,
       member_count: parseInt(countRows[0].member_count),
       item_count: parseInt(countRows[0].item_count),
       items_done: parseInt(countRows[0].items_done),
-    });
+    };
+
+    await emitToEventMembers(getIO(req), event.id, 'event_updated', payload);
+    res.json(payload);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update trip' });
@@ -211,8 +234,12 @@ router.delete('/:id', requireAuth, async (req: AuthRequest, res: Response): Prom
       return;
     }
 
+    const io = getIO(req);
+    const payload = { id: req.params.id };
+
+    await emitToEventMembers(io, req.params.id, 'event_deleted', payload);
     await pool.query('DELETE FROM events WHERE id = $1', [req.params.id]);
-    res.json({ id: req.params.id });
+    res.json(payload);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to delete trip' });

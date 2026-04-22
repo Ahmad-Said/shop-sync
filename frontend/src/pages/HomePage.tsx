@@ -4,6 +4,7 @@ import { Plus, LogIn, ShoppingCart, LogOut, Store, Users, Package, MoreVertical,
 import toast from 'react-hot-toast';
 import { eventsApi } from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
+import { useSocket } from '../hooks/useSocket';
 import { Event } from '../types';
 import CreateEventModal from '../components/CreateEventModal';
 import JoinEventModal from '../components/JoinEventModal';
@@ -29,6 +30,19 @@ export default function HomePage() {
       .catch(() => toast.error('Failed to load trips'))
       .finally(() => setLoading(false));
   }, []);
+
+  useSocket(null, {
+    onEventUpdated: (updated) => {
+      setEvents((prev) => prev.map((event) => (event.id === updated.id ? { ...event, ...updated } : event)));
+      setEditingEvent((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev));
+    },
+    onEventDeleted: ({ id: deletedId }) => {
+      setEvents((prev) => prev.filter((event) => event.id !== deletedId));
+      setEditingEvent((prev) => (prev?.id === deletedId ? null : prev));
+      setDeletingEvent((prev) => (prev?.id === deletedId ? null : prev));
+      setMenuEventId((prev) => (prev === deletedId ? null : prev));
+    },
+  });
 
   function handleCreated(event: Event) {
     setEvents((prev) => [event, ...prev]);

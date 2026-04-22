@@ -76,6 +76,16 @@ export default function EventPage() {
       });
     },
     onPresenceUpdate: (members) => setOnlineMembers(members),
+    onEventUpdated: (updated) => {
+      if (updated.id !== id) return;
+      setEvent((prev) => (prev ? { ...prev, ...updated } : prev));
+    },
+    onEventDeleted: ({ id: deletedId }) => {
+      if (deletedId !== id) return;
+      if (deletingTrip) return;
+      toast('This trip was deleted', { icon: '🗑️' });
+      navigate('/');
+    },
   });
 
   function handleItemAdded(item: Item) {

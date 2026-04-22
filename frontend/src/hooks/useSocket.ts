@@ -1,13 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../store/useAuthStore';
-import { Item, Member } from '../types';
+import { Event, Item, Member } from '../types';
 
 interface SocketHandlers {
   onItemAdded?: (item: Item) => void;
   onItemUpdated?: (item: Item) => void;
   onItemDeleted?: (data: { id: string; event_id: string }) => void;
   onPresenceUpdate?: (members: Member[]) => void;
+  onEventUpdated?: (event: Event) => void;
+  onEventDeleted?: (data: { id: string }) => void;
 }
 
 export function useSocket(eventId: string | null, handlers: SocketHandlers) {
@@ -17,7 +19,7 @@ export function useSocket(eventId: string | null, handlers: SocketHandlers) {
   handlersRef.current = handlers;
 
   useEffect(() => {
-    if (!token || !eventId) return;
+    if (!token) return;
 
     const socket = io('/', {
       auth: { token },
@@ -27,7 +29,9 @@ export function useSocket(eventId: string | null, handlers: SocketHandlers) {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      socket.emit('join_event', { eventId });
+      if (eventId) {
+        socket.emit('join_event', { eventId });
+      }
     });
 
     socket.on('item_added', (item: Item) => {
@@ -46,8 +50,18 @@ export function useSocket(eventId: string | null, handlers: SocketHandlers) {
       handlersRef.current.onPresenceUpdate?.(members);
     });
 
+    socket.on('event_updated', (event: Event) => {
+      handlersRef.current.onEventUpdated?.(event);
+    });
+
+    socket.on('event_deleted', (data: { id: string }) => {
+      handlersRef.current.onEventDeleted?.(data);
+    });
+
     return () => {
-      socket.emit('leave_event', { eventId });
+      if (eventId) {
+        socket.emit('leave_event', { eventId });
+      }
       socket.disconnect();
       socketRef.current = null;
     };

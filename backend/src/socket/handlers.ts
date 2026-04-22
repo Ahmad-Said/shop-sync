@@ -41,6 +41,9 @@ export function registerSocketHandlers(io: Server) {
   io.on('connection', async (socket: Socket) => {
     const user = (socket as any).user as SocketUser;
 
+    // Personal room used for global updates (e.g., trip changes from home page)
+    socket.join(user.id);
+
     // Load avatar color
     try {
       const { rows } = await pool.query('SELECT avatar_color FROM users WHERE id = $1', [user.id]);
