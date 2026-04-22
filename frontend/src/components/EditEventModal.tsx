@@ -36,7 +36,10 @@ export default function EditEventModal({ event, onUpdated, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 modal-backdrop">
+    <div
+      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4 modal-backdrop"
+      onClick={onClose}
+    >
       <div className="glass w-full max-w-sm rounded-2xl p-6 page-enter" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
@@ -84,7 +87,6 @@ export default function EditEventModal({ event, onUpdated, onClose }: Props) {
           </button>
         </form>
       </div>
-      <div className="fixed inset-0 -z-10" onClick={onClose} />
     </div>
   );
 }

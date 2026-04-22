@@ -34,7 +34,10 @@ export default function JoinEventModal({ onJoined, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 modal-backdrop">
+    <div
+      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4 modal-backdrop"
+      onClick={onClose}
+    >
       <div
         className="glass w-full max-w-sm rounded-2xl p-6 page-enter"
         onClick={(e) => e.stopPropagation()}
@@ -83,7 +86,6 @@ export default function JoinEventModal({ onJoined, onClose }: Props) {
           </button>
         </form>
       </div>
-      <div className="fixed inset-0 -z-10" onClick={onClose} />
     </div>
   );
 }
