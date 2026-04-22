@@ -83,12 +83,7 @@ export default function HomePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8 page-enter">
         <div className="flex items-center gap-2.5">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #00F5A0, #00CCFF)' }}
-          >
-            <ShoppingCart size={17} color="#0C0C0F" strokeWidth={2.5} />
-          </div>
+          <img src="/logo-shop-sync.png" alt="ShopSync logo" className="w-9 h-9 object-contain" />
           <div>
             <h1 className="font-display font-800 text-lg leading-none">ShopSync</h1>
             <p className="text-xs leading-none mt-0.5" style={{ color: 'var(--muted)' }}>

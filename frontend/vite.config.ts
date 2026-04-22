@@ -10,13 +10,13 @@ export default defineConfig({
       devOptions: {
         enabled: true,
       },
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'logo-white.png'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'logo-white.png', 'logo-shop-sync.png'],
       manifest: {
         name: 'ShopSync',
         short_name: 'ShopSync',
         description: 'Real-time group shopping coordinator. Shop together, smarter.',
         theme_color: '#0C0C0F',
-        background_color: '#070b14',
+        background_color: '#0C0C0F',
         display: 'standalone',
         start_url: '/',
         icons: [
