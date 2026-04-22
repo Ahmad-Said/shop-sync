@@ -117,7 +117,10 @@ export default function ItemCard({ item, members, currentUserId, eventCreatorId,
   return (
     <div
       className={`item-card glass rounded-xl p-3.5 status-${item.status} relative`}
-      style={{ opacity: isDone ? 0.65 : 1 }}
+      style={{
+        opacity: isDone ? 0.65 : 1,
+        zIndex: showMenu || showForMenu ? 50 : 1,
+      }}
     >
       <div className="flex items-start gap-3">
         {/* Claim button */}
