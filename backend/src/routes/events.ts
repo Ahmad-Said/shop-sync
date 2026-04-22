@@ -148,4 +148,75 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise
   }
 });
 
+router.patch('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { name, store_name } = req.body;
+
+  if (!name?.trim()) {
+    res.status(400).json({ error: 'Trip name required' });
+    return;
+  }
+
+  try {
+    const { rows: eventRows } = await pool.query(
+      `UPDATE events
+       SET name = $1, store_name = $2
+       WHERE id = $3 AND creator_id = $4
+       RETURNING *`,
+      [name.trim(), store_name?.trim() || null, req.params.id, req.user!.id]
+    );
+
+    if (!eventRows[0]) {
+      const { rows: anyRows } = await pool.query('SELECT creator_id FROM events WHERE id = $1', [req.params.id]);
+      if (!anyRows[0]) {
+        res.status(404).json({ error: 'Trip not found' });
+        return;
+      }
+      res.status(403).json({ error: 'Only the trip creator can edit this trip' });
+      return;
+    }
+
+    const event = eventRows[0];
+    const { rows: countRows } = await pool.query(
+      `SELECT
+        (SELECT COUNT(*) FROM event_members WHERE event_id = $1) as member_count,
+        (SELECT COUNT(*) FROM items WHERE event_id = $1) as item_count,
+        (SELECT COUNT(*) FROM items WHERE event_id = $1 AND status = 'in_cart') as items_done`,
+      [event.id]
+    );
+
+    res.json({
+      ...event,
+      member_count: parseInt(countRows[0].member_count),
+      item_count: parseInt(countRows[0].item_count),
+      items_done: parseInt(countRows[0].items_done),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update trip' });
+  }
+});
+
+router.delete('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { rows: eventRows } = await pool.query('SELECT id, creator_id FROM events WHERE id = $1', [req.params.id]);
+    const event = eventRows[0];
+
+    if (!event) {
+      res.status(404).json({ error: 'Trip not found' });
+      return;
+    }
+
+    if (event.creator_id !== req.user!.id) {
+      res.status(403).json({ error: 'Only the trip creator can delete this trip' });
+      return;
+    }
+
+    await pool.query('DELETE FROM events WHERE id = $1', [req.params.id]);
+    res.json({ id: req.params.id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete trip' });
+  }
+});
+
 export default router;

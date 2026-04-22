@@ -17,6 +17,7 @@ ShopSync gives everyone a **live shared list** where items can be claimed, track
 5. **Claim items** — tap the circle to claim an item; it locks to you in real time for everyone else
 6. **Advance status** — as you shop: Claimed → Found → In Cart
 7. **Live presence** — see which group members are active in the store right now
+8. **Install as app (PWA)** — on mobile, install ShopSync for a native-like home-screen experience
 
 ### Item lifecycle
 
@@ -43,6 +44,10 @@ database/   PostgreSQL 16
 ```
 
 All three services are wired together via Docker Compose with hot reload enabled for development. The app uses REST for state mutations and WebSockets for real-time broadcasting — after each database write, the backend emits a socket event to all members of that event room.
+
+## Migrations
+
+Backend migrations in `backend/src/db/migrations` are applied automatically on server startup. This keeps deployed databases up to date when schema changes are introduced.
 
 ### Socket events
 

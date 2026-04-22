@@ -1,18 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, LogIn, ShoppingCart, LogOut, Store, Users, Package } from 'lucide-react';
+import { Plus, LogIn, ShoppingCart, LogOut, Store, Users, Package, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { eventsApi } from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
 import { Event } from '../types';
 import CreateEventModal from '../components/CreateEventModal';
 import JoinEventModal from '../components/JoinEventModal';
+import EditEventModal from '../components/EditEventModal';
+import ConfirmModal from '../components/ConfirmModal';
+import PwaInstallPrompt from '../components/PwaInstallPrompt';
 
 export default function HomePage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
+  const [menuEventId, setMenuEventId] = useState<string | null>(null);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [deletingEvent, setDeletingEvent] = useState<Event | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { user, clearAuth } = useAuthStore();
   const navigate = useNavigate();
 
@@ -38,7 +45,24 @@ export default function HomePage() {
     navigate(`/events/${event.id}`);
   }
 
-  const now = new Date();
+  function handleUpdatedEvent(updated: Event) {
+    setEvents((prev) => prev.map((event) => (event.id === updated.id ? { ...event, ...updated } : event)));
+  }
+
+  async function handleDeleteEvent() {
+    if (!deletingEvent) return;
+    setDeleting(true);
+    try {
+      await eventsApi.delete(deletingEvent.id);
+      setEvents((prev) => prev.filter((event) => event.id !== deletingEvent.id));
+      toast.success('Trip deleted');
+      setDeletingEvent(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to delete trip');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col max-w-lg mx-auto px-4 py-6">
@@ -100,6 +124,8 @@ export default function HomePage() {
         </button>
       </div>
 
+      <PwaInstallPrompt />
+
       {/* Trips list */}
       <div className="page-enter" style={{ animationDelay: '0.1s' }}>
         <h2 className="font-display font-700 text-xs mb-3" style={{ color: 'var(--muted)' }}>
@@ -128,13 +154,19 @@ export default function HomePage() {
                 ? Math.round((event.items_done / event.item_count) * 100)
                 : 0;
 
+              const isCreator = event.creator_id === user?.id;
+
               return (
-                <button
+                <div
                   key={event.id}
-                  onClick={() => navigate(`/events/${event.id}`)}
-                  className="glass w-full rounded-2xl p-4 text-left transition-all hover:border-white/10 item-card"
+                  className="glass w-full rounded-2xl p-4 text-left transition-all hover:border-white/10 item-card relative"
                   style={{ animationDelay: `${i * 0.04}s` }}
                 >
+                  <button
+                    onClick={() => navigate(`/events/${event.id}`)}
+                    className="absolute inset-0 rounded-2xl"
+                    aria-label={`Open trip ${event.name}`}
+                  />
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
@@ -153,6 +185,50 @@ export default function HomePage() {
                       <span className="font-mono text-xs" style={{ color: 'var(--muted)' }}>
                         {new Date(event.created_at).toLocaleDateString()}
                       </span>
+                      {isCreator && (
+                        <div className="relative z-10">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMenuEventId((prev) => (prev === event.id ? null : event.id));
+                            }}
+                            className="p-1 rounded-lg transition-colors"
+                            style={{ color: 'var(--muted)' }}
+                          >
+                            <MoreVertical size={14} />
+                          </button>
+                          {menuEventId === event.id && (
+                            <>
+                              <div className="fixed inset-0 z-10" onClick={() => setMenuEventId(null)} />
+                              <div
+                                className="absolute right-0 top-6 z-20 rounded-xl overflow-hidden shadow-xl"
+                                style={{
+                                  background: 'var(--surface-2)',
+                                  border: '1px solid var(--border)',
+                                  minWidth: 140,
+                                }}
+                              >
+                                <button
+                                  onClick={() => { setMenuEventId(null); setEditingEvent(event); }}
+                                  className="w-full text-left px-3 py-2.5 text-sm flex items-center gap-2 transition-colors hover:bg-white/5"
+                                  style={{ color: 'var(--text)' }}
+                                >
+                                  <Pencil size={13} />
+                                  Edit trip
+                                </button>
+                                <button
+                                  onClick={() => { setMenuEventId(null); setDeletingEvent(event); }}
+                                  className="w-full text-left px-3 py-2.5 text-sm flex items-center gap-2 transition-colors hover:bg-white/5"
+                                  style={{ color: 'var(--coral)' }}
+                                >
+                                  <Trash2 size={13} />
+                                  Delete trip
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -177,7 +253,7 @@ export default function HomePage() {
                       <div className="progress-fill" style={{ width: `${progress}%` }} />
                     </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -189,6 +265,23 @@ export default function HomePage() {
       )}
       {showJoin && (
         <JoinEventModal onJoined={handleJoined} onClose={() => setShowJoin(false)} />
+      )}
+      {editingEvent && (
+        <EditEventModal
+          event={editingEvent}
+          onUpdated={handleUpdatedEvent}
+          onClose={() => setEditingEvent(null)}
+        />
+      )}
+      {deletingEvent && (
+        <ConfirmModal
+          title="Delete trip?"
+          message={`Delete \"${deletingEvent.name}\" and all its items for everyone? This cannot be undone.`}
+          confirmText="Delete"
+          loading={deleting}
+          onConfirm={handleDeleteEvent}
+          onClose={() => setDeletingEvent(null)}
+        />
       )}
     </div>
   );

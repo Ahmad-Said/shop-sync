@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, UserPlus, Plus, Package,
-  CheckCircle2, ShoppingCart, Search, Circle, Store
+  CheckCircle2, ShoppingCart, Search, Circle, Store, MoreVertical, Pencil, Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { eventsApi } from '../api/client';
@@ -13,6 +13,8 @@ import ItemCard from '../components/ItemCard';
 import AddItemForm from '../components/AddItemForm';
 import MemberPresence from '../components/MemberPresence';
 import InviteModal from '../components/InviteModal';
+import ConfirmModal from '../components/ConfirmModal';
+import EditEventModal from '../components/EditEventModal';
 
 type FilterStatus = 'all' | ItemStatus;
 
@@ -39,6 +41,10 @@ export default function EventPage() {
   const [personFilter, setPersonFilter] = useState<'all' | string>('all');
   const [showAdd, setShowAdd] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [showTripMenu, setShowTripMenu] = useState(false);
+  const [showDeleteTrip, setShowDeleteTrip] = useState(false);
+  const [deletingTrip, setDeletingTrip] = useState(false);
+  const [showEditTrip, setShowEditTrip] = useState(false);
   const [onlineMembers, setOnlineMembers] = useState<Member[]>([]);
 
   useEffect(() => {
@@ -94,6 +100,21 @@ export default function EventPage() {
     });
   }
 
+  async function handleDeleteTrip() {
+    if (!event) return;
+    setDeletingTrip(true);
+    try {
+      await eventsApi.delete(event.id);
+      toast.success('Trip deleted');
+      navigate('/');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to delete trip');
+    } finally {
+      setDeletingTrip(false);
+      setShowDeleteTrip(false);
+    }
+  }
+
   const filteredItems = useMemo(() => {
     if (!event) return [];
     let items = event.items;
@@ -136,6 +157,7 @@ export default function EventPage() {
   if (!event) return null;
 
   const groupByPerson = statusFilter === 'all' && personFilter === 'all' && showPersonFilter;
+  const canManageTrip = event.creator_id === user?.id;
 
   return (
     <div className="min-h-screen flex flex-col max-w-lg mx-auto">
@@ -163,14 +185,58 @@ export default function EventPage() {
             )}
           </div>
 
-          <button
-            onClick={() => setShowInvite(true)}
-            className="p-2 rounded-xl transition-colors"
-            style={{ background: 'var(--surface)', color: 'var(--muted)' }}
-            title="Invite members"
-          >
-            <UserPlus size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowInvite(true)}
+              className="p-2 rounded-xl transition-colors"
+              style={{ background: 'var(--surface)', color: 'var(--muted)' }}
+              title="Invite members"
+            >
+              <UserPlus size={16} />
+            </button>
+            {canManageTrip && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowTripMenu((prev) => !prev)}
+                  className="p-2 rounded-xl transition-colors"
+                  style={{ background: 'var(--surface)', color: 'var(--muted)' }}
+                  title="Trip actions"
+                >
+                  <MoreVertical size={16} />
+                </button>
+                {showTripMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowTripMenu(false)} />
+                    <div
+                      className="absolute right-0 top-11 z-20 rounded-xl overflow-hidden shadow-xl"
+                      style={{
+                        background: 'var(--surface-2)',
+                        border: '1px solid var(--border)',
+                        minWidth: 150,
+                      }}
+                    >
+                      <button
+                        onClick={() => { setShowTripMenu(false); setShowEditTrip(true); }}
+                        className="w-full text-left px-3 py-2.5 text-sm flex items-center gap-2 transition-colors hover:bg-white/5"
+                        style={{ color: 'var(--text)' }}
+                      >
+                        <Pencil size={13} />
+                        Edit trip
+                      </button>
+                      <button
+                        onClick={() => { setShowTripMenu(false); setShowDeleteTrip(true); }}
+                        className="w-full text-left px-3 py-2.5 text-sm flex items-center gap-2 transition-colors hover:bg-white/5"
+                        style={{ color: 'var(--coral)' }}
+                      >
+                        <Trash2 size={13} />
+                        Delete trip
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Progress + presence */}
@@ -355,6 +421,7 @@ export default function EventPage() {
                         item={item}
                         members={event.members}
                         currentUserId={user!.id}
+                        eventCreatorId={event.creator_id}
                         onUpdated={handleItemUpdated}
                         onDeleted={handleItemDeleted}
                       />
@@ -380,6 +447,7 @@ export default function EventPage() {
                         item={item}
                         members={event.members}
                         currentUserId={user!.id}
+                        eventCreatorId={event.creator_id}
                         onUpdated={handleItemUpdated}
                         onDeleted={handleItemDeleted}
                       />
@@ -398,6 +466,7 @@ export default function EventPage() {
                 item={item}
                 members={event.members}
                 currentUserId={user!.id}
+                eventCreatorId={event.creator_id}
                 onUpdated={handleItemUpdated}
                 onDeleted={handleItemDeleted}
               />
@@ -425,6 +494,23 @@ export default function EventPage() {
           inviteCode={event.invite_code}
           eventName={event.name}
           onClose={() => setShowInvite(false)}
+        />
+      )}
+      {showEditTrip && (
+        <EditEventModal
+          event={event}
+          onUpdated={(updated) => setEvent((prev) => (prev ? { ...prev, ...updated } : prev))}
+          onClose={() => setShowEditTrip(false)}
+        />
+      )}
+      {showDeleteTrip && (
+        <ConfirmModal
+          title="Delete trip?"
+          message={`Delete \"${event.name}\" and all items in this list? This cannot be undone.`}
+          confirmText="Delete"
+          loading={deletingTrip}
+          onConfirm={handleDeleteTrip}
+          onClose={() => setShowDeleteTrip(false)}
         />
       )}
     </div>

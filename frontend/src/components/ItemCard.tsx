@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { CheckCircle2, Circle, ShoppingCart, Search, Trash2, MoreVertical, User, ChevronDown } from 'lucide-react';
+import { CheckCircle2, Circle, ShoppingCart, Search, Trash2, MoreVertical, User, ChevronDown, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Item, ItemStatus, Member } from '../types';
 import { itemsApi } from '../api/client';
+import ConfirmModal from './ConfirmModal';
+import EditItemModal from './EditItemModal';
 
 const STATUS_ORDER: ItemStatus[] = ['unassigned', 'claimed', 'found', 'in_cart'];
 
@@ -24,14 +26,17 @@ interface Props {
   item: Item;
   members: Member[];
   currentUserId: string;
+  eventCreatorId?: string;
   onUpdated: (item: Item) => void;
   onDeleted: (id: string) => void;
 }
 
-export default function ItemCard({ item, members, currentUserId, onUpdated, onDeleted }: Props) {
+export default function ItemCard({ item, members, currentUserId, eventCreatorId, onUpdated, onDeleted }: Props) {
   const [loading, setLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showForMenu, setShowForMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const isMyCartItem = item.assigned_to === currentUserId;
   const isClaimed = !!item.assigned_to;
@@ -93,9 +98,9 @@ export default function ItemCard({ item, members, currentUserId, onUpdated, onDe
     }
   }
 
+  const canEdit = isCreator || eventCreatorId === currentUserId;
+
   async function handleDelete() {
-    setShowMenu(false);
-    if (!confirm(`Delete "${item.name}"?`)) return;
     setLoading(true);
     try {
       await itemsApi.delete(item.id);
@@ -105,6 +110,7 @@ export default function ItemCard({ item, members, currentUserId, onUpdated, onDe
       toast.error(err.response?.data?.error || 'Failed to delete');
     } finally {
       setLoading(false);
+      setShowDeleteConfirm(false);
     }
   }
 
@@ -302,8 +308,18 @@ export default function ItemCard({ item, members, currentUserId, onUpdated, onDe
                         Advance status
                       </button>
                     )}
+                    {canEdit && (
+                      <button
+                        onClick={() => { setShowMenu(false); setShowEdit(true); }}
+                        className="w-full text-left px-3 py-2.5 text-sm flex items-center gap-2 transition-colors hover:bg-white/5"
+                        style={{ color: 'var(--text)' }}
+                      >
+                        <Pencil size={13} />
+                        Edit item
+                      </button>
+                    )}
                     <button
-                      onClick={handleDelete}
+                      onClick={() => { setShowMenu(false); setShowDeleteConfirm(true); }}
                       className="w-full text-left px-3 py-2.5 text-sm flex items-center gap-2 transition-colors hover:bg-white/5"
                       style={{ color: 'var(--coral)' }}
                     >
@@ -317,6 +333,20 @@ export default function ItemCard({ item, members, currentUserId, onUpdated, onDe
           </div>
         </div>
       </div>
+
+      {showEdit && (
+        <EditItemModal item={item} onUpdated={onUpdated} onClose={() => setShowEdit(false)} />
+      )}
+      {showDeleteConfirm && (
+        <ConfirmModal
+          title="Delete item?"
+          message={`Remove \"${item.name}\" from this trip? This cannot be undone.`}
+          confirmText="Delete"
+          loading={loading}
+          onConfirm={handleDelete}
+          onClose={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </div>
   );
 }

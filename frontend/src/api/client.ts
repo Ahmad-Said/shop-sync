@@ -38,6 +38,8 @@ export const eventsApi = {
   get: (id: string) => api.get(`/events/${id}`),
   create: (data: { name: string; store_name?: string }) => api.post('/events', data),
   join: (invite_code: string) => api.post('/events/join', { invite_code }),
+  update: (id: string, data: { name: string; store_name?: string }) => api.patch(`/events/${id}`, data),
+  delete: (id: string) => api.delete(`/events/${id}`),
 };
 
 export const itemsApi = {
@@ -56,5 +58,7 @@ export const itemsApi = {
     api.patch(`/items/${id}/status`, { status }),
   updateRequestedFor: (id: string, requested_for: string) =>
     api.patch(`/items/${id}/requested-for`, { requested_for }),
+  update: (id: string, data: { name?: string; quantity?: number; unit?: string; category?: string; notes?: string }) =>
+    api.patch(`/items/${id}`, data),
   delete: (id: string) => api.delete(`/items/${id}`),
 };

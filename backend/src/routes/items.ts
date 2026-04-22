@@ -179,6 +179,59 @@ router.patch('/:id/requested-for', requireAuth, async (req: AuthRequest, res: Re
   }
 });
 
+router.patch('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { name, quantity, unit, category, notes } = req.body;
+
+  if (name !== undefined && !String(name).trim()) {
+    res.status(400).json({ error: 'Item name cannot be empty' });
+    return;
+  }
+
+  if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 1)) {
+    res.status(400).json({ error: 'Quantity must be a positive integer' });
+    return;
+  }
+
+  try {
+    const { rows: itemRows } = await pool.query('SELECT * FROM items WHERE id = $1', [req.params.id]);
+    const item = itemRows[0];
+
+    if (!item) {
+      res.status(404).json({ error: 'Item not found' });
+      return;
+    }
+
+    const canEditDirectly = item.added_by === req.user!.id;
+    if (!canEditDirectly) {
+      const { rows: eventRows } = await pool.query('SELECT creator_id FROM events WHERE id = $1', [item.event_id]);
+      if (eventRows[0]?.creator_id !== req.user!.id) {
+        res.status(403).json({ error: 'Only the item adder or trip creator can edit items' });
+        return;
+      }
+    }
+
+    const nextName = name !== undefined ? String(name).trim() : item.name;
+    const nextQuantity = quantity !== undefined ? quantity : item.quantity;
+    const nextUnit = unit !== undefined ? String(unit).trim() || null : item.unit;
+    const nextCategory = category !== undefined ? String(category).trim() || null : item.category;
+    const nextNotes = notes !== undefined ? String(notes).trim() || null : item.notes;
+
+    await pool.query(
+      `UPDATE items
+       SET name = $1, quantity = $2, unit = $3, category = $4, notes = $5
+       WHERE id = $6`,
+      [nextName, nextQuantity, nextUnit, nextCategory, nextNotes, req.params.id]
+    );
+
+    const updated = await getItemWithUser(req.params.id);
+    getIO(req)?.to(item.event_id).emit('item_updated', updated);
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update item' });
+  }
+});
+
 router.delete('/:id', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { rows: itemRows } = await pool.query('SELECT * FROM items WHERE id = $1', [req.params.id]);

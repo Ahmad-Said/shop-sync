@@ -7,6 +7,7 @@ import eventsRouter from './routes/events.js';
 import itemsRouter from './routes/items.js';
 import { registerSocketHandlers } from './socket/handlers.js';
 import { pool } from './db/pool.js';
+import { runMigrations } from './db/migrate.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -51,6 +52,8 @@ async function waitForDB(retries = 10, delay = 2000) {
 }
 
 waitForDB().then(() => {
+  return runMigrations();
+}).then(() => {
   httpServer.listen(PORT, () => {
     console.log(`ShopSync backend running on port ${PORT}`);
   });
