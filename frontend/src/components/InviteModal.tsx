@@ -1,6 +1,7 @@
 import { Copy, X, Check } from 'lucide-react';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import AppDialog from './ui/AppDialog';
 
 interface Props {
   inviteCode: string;
@@ -23,14 +24,8 @@ export default function InviteModal({ inviteCode, eventName, onClose }: Props) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4 modal-backdrop"
-      onClick={onClose}
-    >
-      <div
-        className="glass w-full max-w-sm rounded-2xl p-6 page-enter"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <AppDialog onClose={onClose}>
+      <div className="glass w-full max-w-sm rounded-2xl p-6 page-enter">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-display font-700 text-base">Invite to Trip</h2>
           <button onClick={onClose} style={{ color: 'var(--muted)' }}>
@@ -66,6 +61,6 @@ export default function InviteModal({ inviteCode, eventName, onClose }: Props) {
           {copied ? 'Copied!' : 'Copy Code'}
         </button>
       </div>
-    </div>
+    </AppDialog>
   );
 }

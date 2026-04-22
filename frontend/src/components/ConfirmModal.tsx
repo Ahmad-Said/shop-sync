@@ -1,4 +1,5 @@
 import { AlertTriangle, X } from 'lucide-react';
+import AppDialog from './ui/AppDialog';
 
 interface Props {
   title: string;
@@ -24,11 +25,8 @@ export default function ConfirmModal({
   const isDanger = confirmColor === 'danger';
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4 modal-backdrop"
-      onClick={onClose}
-    >
-      <div className="glass w-full max-w-sm rounded-2xl p-6 page-enter" onClick={(e) => e.stopPropagation()}>
+    <AppDialog onClose={onClose}>
+      <div className="glass w-full max-w-sm rounded-2xl p-6 page-enter">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <AlertTriangle size={17} style={{ color: isDanger ? 'var(--coral)' : 'var(--neon)' }} />
@@ -62,7 +60,7 @@ export default function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </AppDialog>
   );
 }
 

@@ -3,6 +3,7 @@ import { Pencil, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { eventsApi } from '../api/client';
 import { Event } from '../types';
+import AppDialog from './ui/AppDialog';
 
 interface Props {
   event: Event;
@@ -36,11 +37,8 @@ export default function EditEventModal({ event, onUpdated, onClose }: Props) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4 modal-backdrop"
-      onClick={onClose}
-    >
-      <div className="glass w-full max-w-sm rounded-2xl p-6 page-enter" onClick={(e) => e.stopPropagation()}>
+    <AppDialog onClose={onClose}>
+      <div className="glass w-full max-w-sm rounded-2xl p-6 page-enter">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <Pencil size={17} style={{ color: 'var(--neon)' }} />
@@ -87,7 +85,7 @@ export default function EditEventModal({ event, onUpdated, onClose }: Props) {
           </button>
         </form>
       </div>
-    </div>
+    </AppDialog>
   );
 }
 

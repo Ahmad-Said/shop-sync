@@ -3,6 +3,7 @@ import { X, Hash } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { eventsApi } from '../api/client';
 import { Event } from '../types';
+import AppDialog from './ui/AppDialog';
 
 interface Props {
   onJoined: (event: Event) => void;
@@ -34,14 +35,8 @@ export default function JoinEventModal({ onJoined, onClose }: Props) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4 modal-backdrop"
-      onClick={onClose}
-    >
-      <div
-        className="glass w-full max-w-sm rounded-2xl p-6 page-enter"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <AppDialog onClose={onClose}>
+      <div className="glass w-full max-w-sm rounded-2xl p-6 page-enter">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <Hash size={17} style={{ color: 'var(--amber)' }} />
@@ -86,6 +81,6 @@ export default function JoinEventModal({ onJoined, onClose }: Props) {
           </button>
         </form>
       </div>
-    </div>
+    </AppDialog>
   );
 }

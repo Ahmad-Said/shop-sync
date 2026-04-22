@@ -3,6 +3,7 @@ import { Pencil, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { itemsApi } from '../api/client';
 import { Item } from '../types';
+import AppDialog from './ui/AppDialog';
 
 const CATEGORIES = ['Produce', 'Dairy', 'Meat', 'Bakery', 'Frozen', 'Beverages', 'Snacks', 'Cleaning', 'Personal Care', 'Other'];
 
@@ -44,11 +45,8 @@ export default function EditItemModal({ item, onUpdated, onClose }: Props) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4 modal-backdrop"
-      onClick={onClose}
-    >
-      <div className="glass w-full max-w-sm rounded-2xl p-6 page-enter" onClick={(e) => e.stopPropagation()}>
+    <AppDialog onClose={onClose}>
+      <div className="glass w-full max-w-sm rounded-2xl p-6 page-enter">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
             <Pencil size={17} style={{ color: 'var(--neon)' }} />
@@ -122,7 +120,7 @@ export default function EditItemModal({ item, onUpdated, onClose }: Props) {
           </button>
         </form>
       </div>
-    </div>
+    </AppDialog>
   );
 }
 
