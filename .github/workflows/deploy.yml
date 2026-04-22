@@ -1,0 +1,56 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ "master" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: hetzner-prod
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            cd /root/config/shop-sync
+            git fetch --all
+            git reset --hard origin/master
+            docker compose up -d --build
+            docker image prune -f
+
+      - name: Send Telegram Success Notification
+        uses: appleboy/telegram-action@master
+        if: success()
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ✅ ShopSync deployed to production!
+            📦 Repository: ${{ github.repository }}
+            🌿 Branch: ${{ github.ref_name }}
+            👤 Triggered by: ${{ github.actor }}
+
+            📝 Last commit: ${{ github.event.head_commit.message || 'N/A' }}
+            🔗 Commit URL: ${{ github.event.head_commit.url }}
+            🕒 Deployed at: ${{ github.event.head_commit.timestamp || 'N/A' }}
+
+      - name: Send Telegram Failure Notification
+        uses: appleboy/telegram-action@master
+        if: failure()
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ❌ ShopSync deployment FAILED!
+            📦 Repository: ${{ github.repository }}
+            🌿 Branch: ${{ github.ref_name }}
+            👤 Triggered by: ${{ github.actor }}
+
+            📝 Last commit: ${{ github.event.head_commit.message || 'N/A' }}
+            🔗 Commit URL: ${{ github.event.head_commit.url }}
+            🕒 Failed at: ${{ github.event.head_commit.timestamp || 'N/A' }}
