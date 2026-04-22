@@ -15,6 +15,9 @@ export interface Item {
   unit: string | null;
   category: string | null;
   notes: string | null;
+  requested_for: string | null;
+  requested_for_username: string | null;
+  requested_for_color: string | null;
   assigned_to: string | null;
   assigned_username: string | null;
   assigned_color: string | null;

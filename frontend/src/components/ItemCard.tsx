@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { CheckCircle2, Circle, ShoppingCart, Search, Trash2, MoreVertical, User } from 'lucide-react';
+import { CheckCircle2, Circle, ShoppingCart, Search, Trash2, MoreVertical, User, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Item, ItemStatus } from '../types';
+import { Item, ItemStatus, Member } from '../types';
 import { itemsApi } from '../api/client';
 
 const STATUS_ORDER: ItemStatus[] = ['unassigned', 'claimed', 'found', 'in_cart'];
@@ -22,23 +22,31 @@ const STATUS_ICONS: Record<ItemStatus, React.ReactNode> = {
 
 interface Props {
   item: Item;
+  members: Member[];
   currentUserId: string;
   onUpdated: (item: Item) => void;
   onDeleted: (id: string) => void;
 }
 
-export default function ItemCard({ item, currentUserId, onUpdated, onDeleted }: Props) {
+export default function ItemCard({ item, members, currentUserId, onUpdated, onDeleted }: Props) {
   const [loading, setLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showForMenu, setShowForMenu] = useState(false);
 
-  const isMyItem = item.assigned_to === currentUserId;
+  const isMyCartItem = item.assigned_to === currentUserId;
   const isClaimed = !!item.assigned_to;
+  const isCreator = item.added_by === currentUserId;
+  const isDone = item.status === 'in_cart';
+
+  const requestedForName = item.requested_for_username;
+  const requestedForColor = item.requested_for_color;
+  const isForMe = item.requested_for === currentUserId || (!item.requested_for && item.added_by === currentUserId);
 
   async function handleClaim() {
     if (loading) return;
     setLoading(true);
     try {
-      if (isMyItem) {
+      if (isMyCartItem) {
         const res = await itemsApi.unclaim(item.id);
         onUpdated(res.data);
         toast('Item released', { icon: '↩️' });
@@ -55,7 +63,7 @@ export default function ItemCard({ item, currentUserId, onUpdated, onDeleted }: 
   }
 
   async function handleStatusAdvance() {
-    if (!isMyItem || loading) return;
+    if (!isMyCartItem || loading) return;
     const currentIdx = STATUS_ORDER.indexOf(item.status);
     const next = STATUS_ORDER[Math.min(currentIdx + 1, STATUS_ORDER.length - 1)];
     if (next === item.status) return;
@@ -63,6 +71,21 @@ export default function ItemCard({ item, currentUserId, onUpdated, onDeleted }: 
     try {
       const res = await itemsApi.updateStatus(item.id, next);
       onUpdated(res.data);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleReassign(memberId: string) {
+    setShowForMenu(false);
+    if (memberId === item.requested_for) return;
+    setLoading(true);
+    try {
+      const res = await itemsApi.updateRequestedFor(item.id, memberId);
+      onUpdated(res.data);
+      toast.success('Reassigned');
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed');
     } finally {
@@ -85,8 +108,6 @@ export default function ItemCard({ item, currentUserId, onUpdated, onDeleted }: 
     }
   }
 
-  const isDone = item.status === 'in_cart';
-
   return (
     <div
       className={`item-card glass rounded-xl p-3.5 status-${item.status} relative`}
@@ -96,21 +117,21 @@ export default function ItemCard({ item, currentUserId, onUpdated, onDeleted }: 
         {/* Claim button */}
         <button
           onClick={handleClaim}
-          disabled={loading || (isClaimed && !isMyItem)}
+          disabled={loading || (isClaimed && !isMyCartItem)}
           className="mt-0.5 flex-shrink-0 transition-all duration-150 disabled:cursor-not-allowed"
           style={{
             color: isClaimed
-              ? isMyItem ? 'var(--neon)' : 'var(--muted)'
+              ? isMyCartItem ? 'var(--neon)' : 'var(--muted)'
               : 'var(--muted)',
-            opacity: (isClaimed && !isMyItem) ? 0.4 : 1,
+            opacity: (isClaimed && !isMyCartItem) ? 0.4 : 1,
           }}
-          title={isMyItem ? 'Release item' : isClaimed ? 'Claimed by ' + item.assigned_username : 'Claim this item'}
+          title={isMyCartItem ? 'Release item' : isClaimed ? 'Picked up by ' + item.assigned_username : 'Pick up this item'}
         >
           {loading ? (
             <div className="spinner" style={{ width: 16, height: 16 }} />
           ) : isDone ? (
             <CheckCircle2 size={18} color="var(--neon)" />
-          ) : isClaimed && isMyItem ? (
+          ) : isClaimed && isMyCartItem ? (
             <CheckCircle2 size={18} />
           ) : isClaimed ? (
             <CheckCircle2 size={18} />
@@ -123,6 +144,7 @@ export default function ItemCard({ item, currentUserId, onUpdated, onDeleted }: 
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
+              {/* Name + qty */}
               <p
                 className="font-body font-500 leading-snug"
                 style={{
@@ -137,6 +159,76 @@ export default function ItemCard({ item, currentUserId, onUpdated, onDeleted }: 
                   </span>
                 )}
               </p>
+
+              {/* For whom */}
+              {members.length > 1 && (
+                <div className="relative flex items-center gap-1 mt-0.5">
+                  <span style={{ color: 'var(--muted)', fontSize: 11 }}>for</span>
+                  {isCreator ? (
+                    <button
+                      onClick={() => setShowForMenu(!showForMenu)}
+                      className="flex items-center gap-1 rounded-md px-1 py-0.5 transition-colors"
+                      style={{
+                        background: showForMenu ? 'var(--surface-2)' : 'transparent',
+                        color: isForMe ? 'var(--neon)' : 'var(--text)',
+                        fontSize: 11,
+                      }}
+                    >
+                      <span
+                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        style={{ background: requestedForColor || 'var(--muted)' }}
+                      />
+                      {isForMe ? 'me' : requestedForName || '—'}
+                      <ChevronDown size={9} style={{ opacity: 0.6 }} />
+                    </button>
+                  ) : (
+                    <span className="flex items-center gap-1" style={{ fontSize: 11, color: isForMe ? 'var(--neon)' : 'var(--text)' }}>
+                      <span
+                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        style={{ background: requestedForColor || 'var(--muted)' }}
+                      />
+                      {isForMe ? 'me' : requestedForName || '—'}
+                    </span>
+                  )}
+
+                  {showForMenu && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowForMenu(false)} />
+                      <div
+                        className="absolute left-0 top-6 z-20 rounded-xl overflow-hidden shadow-xl"
+                        style={{
+                          background: 'var(--surface-2)',
+                          border: '1px solid var(--border)',
+                          minWidth: 160,
+                        }}
+                      >
+                        {members.map((member) => (
+                          <button
+                            key={member.id}
+                            onClick={() => handleReassign(member.id)}
+                            className="w-full text-left px-3 py-2.5 flex items-center gap-2 transition-colors hover:bg-white/5"
+                            style={{
+                              fontSize: 13,
+                              color: member.id === item.requested_for ? 'var(--neon)' : 'var(--text)',
+                            }}
+                          >
+                            <span
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ background: member.avatar_color }}
+                            />
+                            {member.username}
+                            {member.id === currentUserId && (
+                              <span style={{ color: 'var(--muted)', fontSize: 11 }}>(me)</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Status + category + claimer */}
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 {item.category && (
                   <span className="category-chip">{item.category}</span>
@@ -146,11 +238,16 @@ export default function ItemCard({ item, currentUserId, onUpdated, onDeleted }: 
                   {STATUS_LABELS[item.status]}
                 </span>
                 {item.assigned_username && (
-                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                    → {item.assigned_username}
+                  <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--muted)' }}>
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ background: item.assigned_color || 'var(--muted)' }}
+                    />
+                    {item.assigned_username}
                   </span>
                 )}
               </div>
+
               {item.notes && (
                 <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
                   {item.notes}
@@ -160,8 +257,7 @@ export default function ItemCard({ item, currentUserId, onUpdated, onDeleted }: 
 
             {/* Action menu */}
             <div className="relative flex-shrink-0 flex items-center gap-1">
-              {/* Advance status button for owner */}
-              {isMyItem && item.status !== 'in_cart' && (
+              {isMyCartItem && item.status !== 'in_cart' && (
                 <button
                   onClick={handleStatusAdvance}
                   disabled={loading}
@@ -187,10 +283,7 @@ export default function ItemCard({ item, currentUserId, onUpdated, onDeleted }: 
 
               {showMenu && (
                 <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setShowMenu(false)}
-                  />
+                  <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
                   <div
                     className="absolute right-0 top-6 z-20 rounded-xl overflow-hidden shadow-xl"
                     style={{
@@ -199,7 +292,7 @@ export default function ItemCard({ item, currentUserId, onUpdated, onDeleted }: 
                       minWidth: 140,
                     }}
                   >
-                    {isMyItem && item.status !== 'in_cart' && (
+                    {isMyCartItem && item.status !== 'in_cart' && (
                       <button
                         onClick={() => { handleStatusAdvance(); setShowMenu(false); }}
                         className="w-full text-left px-3 py-2.5 text-sm flex items-center gap-2 transition-colors hover:bg-white/5"
@@ -224,15 +317,6 @@ export default function ItemCard({ item, currentUserId, onUpdated, onDeleted }: 
           </div>
         </div>
       </div>
-
-      {/* Assigned color strip */}
-      {item.assigned_color && (
-        <div
-          className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full"
-          style={{ background: item.assigned_color }}
-          title={item.assigned_username || ''}
-        />
-      )}
     </div>
   );
 }

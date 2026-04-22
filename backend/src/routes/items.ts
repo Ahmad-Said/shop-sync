@@ -19,9 +19,12 @@ async function isMember(eventId: string, userId: string): Promise<boolean> {
 
 async function getItemWithUser(itemId: string) {
   const { rows } = await pool.query(
-    `SELECT i.*, u.username as assigned_username, u.avatar_color as assigned_color
+    `SELECT i.*,
+       u.username  AS assigned_username,  u.avatar_color AS assigned_color,
+       rf.username AS requested_for_username, rf.avatar_color AS requested_for_color
      FROM items i
-     LEFT JOIN users u ON u.id = i.assigned_to
+     LEFT JOIN users u  ON u.id  = i.assigned_to
+     LEFT JOIN users rf ON rf.id = i.requested_for
      WHERE i.id = $1`,
     [itemId]
   );
@@ -29,7 +32,7 @@ async function getItemWithUser(itemId: string) {
 }
 
 router.post('/', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { event_id, name, quantity, unit, category, notes } = req.body;
+  const { event_id, name, quantity, unit, category, notes, requested_for } = req.body;
 
   if (!event_id || !name?.trim()) {
     res.status(400).json({ error: 'event_id and name are required' });
@@ -41,11 +44,18 @@ router.post('/', requireAuth, async (req: AuthRequest, res: Response): Promise<v
     return;
   }
 
+  const effectiveRequestedFor = requested_for || req.user!.id;
+
+  if (requested_for && !(await isMember(event_id, requested_for))) {
+    res.status(400).json({ error: 'requested_for user is not a member of this event' });
+    return;
+  }
+
   try {
     const { rows } = await pool.query(
-      `INSERT INTO items (event_id, name, quantity, unit, category, notes, added_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [event_id, name.trim(), quantity || 1, unit?.trim() || null, category?.trim() || null, notes?.trim() || null, req.user!.id]
+      `INSERT INTO items (event_id, name, quantity, unit, category, notes, added_by, requested_for)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      [event_id, name.trim(), quantity || 1, unit?.trim() || null, category?.trim() || null, notes?.trim() || null, req.user!.id, effectiveRequestedFor]
     );
     const item = await getItemWithUser(rows[0].id);
     getIO(req)?.to(event_id).emit('item_added', item);
@@ -135,6 +145,37 @@ router.patch('/:id/status', requireAuth, async (req: AuthRequest, res: Response)
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+router.patch('/:id/requested-for', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { requested_for } = req.body;
+
+  if (!requested_for) {
+    res.status(400).json({ error: 'requested_for is required' }); return;
+  }
+
+  try {
+    const { rows: itemRows } = await pool.query('SELECT * FROM items WHERE id = $1', [req.params.id]);
+    const item = itemRows[0];
+
+    if (!item) { res.status(404).json({ error: 'Item not found' }); return; }
+
+    if (item.added_by !== req.user!.id) {
+      res.status(403).json({ error: 'Only the item creator can reassign it' }); return;
+    }
+
+    if (!(await isMember(item.event_id, requested_for))) {
+      res.status(400).json({ error: 'User is not a member of this event' }); return;
+    }
+
+    await pool.query('UPDATE items SET requested_for = $1 WHERE id = $2', [requested_for, req.params.id]);
+    const updated = await getItemWithUser(req.params.id);
+    getIO(req)?.to(item.event_id).emit('item_updated', updated);
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to reassign item' });
   }
 });
 

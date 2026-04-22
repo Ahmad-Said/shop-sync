@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS items (
   unit VARCHAR(50),
   category VARCHAR(100),
   notes TEXT,
+  requested_for UUID REFERENCES users(id) ON DELETE SET NULL,
   assigned_to UUID REFERENCES users(id) ON DELETE SET NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'unassigned' CHECK (status IN ('unassigned', 'claimed', 'found', 'in_cart')),
   added_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

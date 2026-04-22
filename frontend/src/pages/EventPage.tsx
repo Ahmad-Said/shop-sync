@@ -16,13 +16,17 @@ import InviteModal from '../components/InviteModal';
 
 type FilterStatus = 'all' | ItemStatus;
 
-const FILTER_TABS: { key: FilterStatus; label: string; icon: React.ReactNode }[] = [
+const STATUS_TABS: { key: FilterStatus; label: string; icon: React.ReactNode }[] = [
   { key: 'all', label: 'All', icon: <Package size={13} /> },
   { key: 'unassigned', label: 'Open', icon: <Circle size={13} /> },
   { key: 'claimed', label: 'Claimed', icon: <Search size={13} /> },
   { key: 'found', label: 'Found', icon: <Search size={13} /> },
   { key: 'in_cart', label: 'Done', icon: <CheckCircle2 size={13} /> },
 ];
+
+function itemRequestedFor(item: Item): string {
+  return item.requested_for ?? item.added_by;
+}
 
 export default function EventPage() {
   const { id } = useParams<{ id: string }>();
@@ -31,7 +35,8 @@ export default function EventPage() {
 
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<FilterStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
+  const [personFilter, setPersonFilter] = useState<'all' | string>('all');
   const [showAdd, setShowAdd] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [onlineMembers, setOnlineMembers] = useState<Member[]>([]);
@@ -44,7 +49,6 @@ export default function EventPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // Real-time socket
   useSocket(id || null, {
     onItemAdded: (item) => {
       setEvent((prev) => {
@@ -56,10 +60,7 @@ export default function EventPage() {
     onItemUpdated: (item) => {
       setEvent((prev) => {
         if (!prev) return prev;
-        return {
-          ...prev,
-          items: prev.items.map((i) => i.id === item.id ? item : i),
-        };
+        return { ...prev, items: prev.items.map((i) => i.id === item.id ? item : i) };
       });
     },
     onItemDeleted: ({ id: itemId }) => {
@@ -68,9 +69,7 @@ export default function EventPage() {
         return { ...prev, items: prev.items.filter((i) => i.id !== itemId) };
       });
     },
-    onPresenceUpdate: (members) => {
-      setOnlineMembers(members);
-    },
+    onPresenceUpdate: (members) => setOnlineMembers(members),
   });
 
   function handleItemAdded(item: Item) {
@@ -97,11 +96,11 @@ export default function EventPage() {
 
   const filteredItems = useMemo(() => {
     if (!event) return [];
-    const items = filter === 'all'
-      ? event.items
-      : event.items.filter((i) => i.status === filter);
+    let items = event.items;
+    if (statusFilter !== 'all') items = items.filter((i) => i.status === statusFilter);
+    if (personFilter !== 'all') items = items.filter((i) => itemRequestedFor(i) === personFilter);
     return items;
-  }, [event?.items, filter]);
+  }, [event?.items, statusFilter, personFilter]);
 
   const stats = useMemo(() => {
     if (!event) return { total: 0, done: 0, claimed: 0, pct: 0 };
@@ -114,6 +113,18 @@ export default function EventPage() {
 
   const onlineIds = useMemo(() => onlineMembers.map((m) => m.id), [onlineMembers]);
 
+  const showPersonFilter = (event?.members.length ?? 0) > 1;
+
+  // Current user's section first, then others in join order
+  const orderedMembers = useMemo(() => {
+    if (!event) return [];
+    return [...event.members].sort((a, b) => {
+      if (a.id === user?.id) return -1;
+      if (b.id === user?.id) return 1;
+      return 0;
+    });
+  }, [event?.members, user?.id]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -123,6 +134,8 @@ export default function EventPage() {
   }
 
   if (!event) return null;
+
+  const groupByPerson = statusFilter === 'all' && personFilter === 'all' && showPersonFilter;
 
   return (
     <div className="min-h-screen flex flex-col max-w-lg mx-auto">
@@ -173,23 +186,19 @@ export default function EventPage() {
               )}
             </div>
           </div>
-          <MemberPresence
-            members={event.members}
-            onlineIds={onlineIds}
-          />
+          <MemberPresence members={event.members} onlineIds={onlineIds} />
         </div>
 
-        {/* Filter tabs */}
+        {/* Status filter tabs */}
         <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1 no-scrollbar">
-          {FILTER_TABS.map((tab) => {
-            const count = tab.key === 'all'
-              ? event.items.length
-              : event.items.filter((i) => i.status === tab.key).length;
-            const isActive = filter === tab.key;
+          {STATUS_TABS.map((tab) => {
+            const base = personFilter === 'all' ? event.items : event.items.filter((i) => itemRequestedFor(i) === personFilter);
+            const count = tab.key === 'all' ? base.length : base.filter((i) => i.status === tab.key).length;
+            const isActive = statusFilter === tab.key;
             return (
               <button
                 key={tab.key}
-                onClick={() => setFilter(tab.key)}
+                onClick={() => setStatusFilter(tab.key)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl whitespace-nowrap transition-all flex-shrink-0"
                 style={{
                   background: isActive ? 'rgba(0,245,160,0.12)' : 'var(--surface)',
@@ -219,14 +228,74 @@ export default function EventPage() {
             );
           })}
         </div>
+
+        {/* Person filter chips — only when multiple members */}
+        {showPersonFilter && (
+          <div className="flex gap-1.5 overflow-x-auto pt-1.5 pb-0.5 -mx-1 px-1 no-scrollbar">
+            <button
+              onClick={() => setPersonFilter('all')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl whitespace-nowrap transition-all flex-shrink-0"
+              style={{
+                background: personFilter === 'all' ? 'rgba(167,139,250,0.15)' : 'var(--surface)',
+                color: personFilter === 'all' ? '#C4B5FD' : 'var(--muted)',
+                border: `1px solid ${personFilter === 'all' ? 'rgba(167,139,250,0.3)' : 'var(--border)'}`,
+                fontSize: 12,
+                fontFamily: 'Syne, sans-serif',
+                fontWeight: 600,
+              }}
+            >
+              Everyone
+            </button>
+            {event.members.map((member) => {
+              const base = statusFilter === 'all' ? event.items : event.items.filter((i) => i.status === statusFilter);
+              const count = base.filter((i) => itemRequestedFor(i) === member.id).length;
+              const isActive = personFilter === member.id;
+              return (
+                <button
+                  key={member.id}
+                  onClick={() => setPersonFilter(isActive ? 'all' : member.id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl whitespace-nowrap transition-all flex-shrink-0"
+                  style={{
+                    background: isActive ? 'rgba(167,139,250,0.15)' : 'var(--surface)',
+                    color: isActive ? '#C4B5FD' : 'var(--muted)',
+                    border: `1px solid ${isActive ? 'rgba(167,139,250,0.3)' : 'var(--border)'}`,
+                    fontSize: 12,
+                    fontFamily: 'Syne, sans-serif',
+                    fontWeight: 600,
+                  }}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ background: member.avatar_color }}
+                  />
+                  {member.id === user?.id ? 'Mine' : member.username}
+                  {count > 0 && (
+                    <span
+                      className="rounded-full px-1.5 py-0.5 font-mono"
+                      style={{
+                        background: isActive ? 'rgba(167,139,250,0.25)' : 'var(--border)',
+                        fontSize: 10,
+                        minWidth: 18,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Content */}
       <div className="flex-1 px-4 py-4 space-y-2.5 pb-32">
-        {/* Add item form */}
         {showAdd && (
           <AddItemForm
             eventId={event.id}
+            members={event.members}
+            currentUserId={user!.id}
             onAdded={(item) => { handleItemAdded(item); }}
             onClose={() => setShowAdd(false)}
           />
@@ -237,7 +306,7 @@ export default function EventPage() {
             className="rounded-2xl p-10 text-center"
             style={{ background: 'var(--surface)', border: '1px dashed var(--border)' }}
           >
-            {filter === 'all' ? (
+            {statusFilter === 'all' && personFilter === 'all' ? (
               <>
                 <ShoppingCart size={28} style={{ color: 'var(--muted)', margin: '0 auto 12px' }} />
                 <p className="font-display font-600 text-sm mb-1">Empty list</p>
@@ -253,77 +322,87 @@ export default function EventPage() {
                 </button>
               </>
             ) : (
-              <>
-                <p className="font-display font-600 text-sm" style={{ color: 'var(--muted)' }}>
-                  No {FILTER_TABS.find(t => t.key === filter)?.label.toLowerCase()} items
-                </p>
-              </>
+              <p className="font-display font-600 text-sm" style={{ color: 'var(--muted)' }}>
+                No items
+              </p>
             )}
           </div>
-        ) : (
+        ) : groupByPerson ? (
+          /* Group by person when viewing all statuses + all persons */
           <>
-            {/* My items section */}
-            {filter === 'all' && (() => {
-              const mine = filteredItems.filter((i) => i.assigned_to === user?.id);
-              const others = filteredItems.filter((i) => i.assigned_to !== user?.id);
+            {orderedMembers.map((member) => {
+              const memberItems = filteredItems.filter((i) => itemRequestedFor(i) === member.id);
+              if (memberItems.length === 0) return null;
+              const isMe = member.id === user?.id;
               return (
-                <>
-                  {mine.length > 0 && (
-                    <div>
-                      <p className="text-xs font-display font-600 mb-2" style={{ color: 'var(--neon)' }}>
-                        MY ITEMS ({mine.length})
-                      </p>
-                      <div className="space-y-2">
-                        {mine.map((item) => (
-                          <ItemCard
-                            key={item.id}
-                            item={item}
-                            currentUserId={user!.id}
-                            onUpdated={handleItemUpdated}
-                            onDeleted={handleItemDeleted}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {others.length > 0 && (
-                    <div>
-                      {mine.length > 0 && (
-                        <p className="text-xs font-display font-600 mb-2 mt-4" style={{ color: 'var(--muted)' }}>
-                          ALL ITEMS ({others.length})
-                        </p>
-                      )}
-                      <div className="space-y-2">
-                        {others.map((item) => (
-                          <ItemCard
-                            key={item.id}
-                            item={item}
-                            currentUserId={user!.id}
-                            onUpdated={handleItemUpdated}
-                            onDeleted={handleItemDeleted}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
+                <div key={member.id}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ background: member.avatar_color }}
+                    />
+                    <p
+                      className="text-xs font-display font-600"
+                      style={{ color: isMe ? 'var(--neon)' : 'var(--muted)' }}
+                    >
+                      {isMe ? 'MY LIST' : member.username.toUpperCase()} ({memberItems.length})
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {memberItems.map((item) => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        members={event.members}
+                        currentUserId={user!.id}
+                        onUpdated={handleItemUpdated}
+                        onDeleted={handleItemDeleted}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {/* Items with no member match (shouldn't happen but safety net) */}
+            {(() => {
+              const memberIds = event.members.map((m) => m.id);
+              const orphaned = filteredItems.filter((i) => !memberIds.includes(itemRequestedFor(i)));
+              if (orphaned.length === 0) return null;
+              return (
+                <div>
+                  <p className="text-xs font-display font-600 mb-2" style={{ color: 'var(--muted)' }}>
+                    OTHER ({orphaned.length})
+                  </p>
+                  <div className="space-y-2">
+                    {orphaned.map((item) => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        members={event.members}
+                        currentUserId={user!.id}
+                        onUpdated={handleItemUpdated}
+                        onDeleted={handleItemDeleted}
+                      />
+                    ))}
+                  </div>
+                </div>
               );
             })()}
-
-            {filter !== 'all' && (
-              <div className="space-y-2">
-                {filteredItems.map((item) => (
-                  <ItemCard
-                    key={item.id}
-                    item={item}
-                    currentUserId={user!.id}
-                    onUpdated={handleItemUpdated}
-                    onDeleted={handleItemDeleted}
-                  />
-                ))}
-              </div>
-            )}
           </>
+        ) : (
+          /* Flat list for status-filtered or person-filtered views */
+          <div className="space-y-2">
+            {filteredItems.map((item) => (
+              <ItemCard
+                key={item.id}
+                item={item}
+                members={event.members}
+                currentUserId={user!.id}
+                onUpdated={handleItemUpdated}
+                onDeleted={handleItemDeleted}
+              />
+            ))}
+          </div>
         )}
       </div>
 

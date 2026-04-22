@@ -2,22 +2,25 @@ import { useState, useRef, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { itemsApi } from '../api/client';
-import { Item } from '../types';
+import { Item, Member } from '../types';
 
 const CATEGORIES = ['Produce', 'Dairy', 'Meat', 'Bakery', 'Frozen', 'Beverages', 'Snacks', 'Cleaning', 'Personal Care', 'Other'];
 
 interface Props {
   eventId: string;
+  members: Member[];
+  currentUserId: string;
   onAdded: (item: Item) => void;
   onClose: () => void;
 }
 
-export default function AddItemForm({ eventId, onAdded, onClose }: Props) {
+export default function AddItemForm({ eventId, members, currentUserId, onAdded, onClose }: Props) {
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState('');
   const [category, setCategory] = useState('');
   const [notes, setNotes] = useState('');
+  const [requestedFor, setRequestedFor] = useState(currentUserId);
   const [loading, setLoading] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -37,6 +40,7 @@ export default function AddItemForm({ eventId, onAdded, onClose }: Props) {
         unit: unit.trim() || undefined,
         category: category || undefined,
         notes: notes.trim() || undefined,
+        requested_for: requestedFor,
       });
       onAdded(res.data);
       setName('');
@@ -44,6 +48,7 @@ export default function AddItemForm({ eventId, onAdded, onClose }: Props) {
       setUnit('');
       setCategory('');
       setNotes('');
+      setRequestedFor(currentUserId);
       nameRef.current?.focus();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to add item');
@@ -94,6 +99,40 @@ export default function AddItemForm({ eventId, onAdded, onClose }: Props) {
             maxLength={50}
           />
         </div>
+
+        {/* For whom — only shown when there are multiple members */}
+        {members.length > 1 && (
+          <div>
+            <p className="text-xs font-display font-600 mb-1.5" style={{ color: 'var(--muted)' }}>FOR</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {members.map((member) => {
+                const isSelected = requestedFor === member.id;
+                return (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onClick={() => setRequestedFor(member.id)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-500 transition-all"
+                    style={{
+                      background: isSelected ? 'rgba(0,245,160,0.12)' : 'var(--surface-2)',
+                      color: isSelected ? 'var(--neon)' : 'var(--muted)',
+                      border: `1px solid ${isSelected ? 'rgba(0,245,160,0.25)' : 'var(--border)'}`,
+                    }}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ background: member.avatar_color }}
+                    />
+                    {member.username}
+                    {member.id === currentUserId && (
+                      <span style={{ opacity: 0.6 }}>(me)</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Category */}
         <div className="flex flex-wrap gap-1.5">

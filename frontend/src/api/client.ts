@@ -48,10 +48,13 @@ export const itemsApi = {
     unit?: string;
     category?: string;
     notes?: string;
+    requested_for?: string;
   }) => api.post('/items', data),
   claim: (id: string) => api.patch(`/items/${id}/claim`),
   unclaim: (id: string) => api.patch(`/items/${id}/unclaim`),
   updateStatus: (id: string, status: string) =>
     api.patch(`/items/${id}/status`, { status }),
+  updateRequestedFor: (id: string, requested_for: string) =>
+    api.patch(`/items/${id}/requested-for`, { requested_for }),
   delete: (id: string) => api.delete(`/items/${id}`),
 };
