@@ -1,6 +1,29 @@
 # ShopSync
 
-Real-time group shopping coordinator. Create a shopping trip, add items, and coordinate with your group in-store — no two people grab the same thing.
+A real-time group shopping coordinator that helps teams collaborate while shopping in brick-and-mortar stores. ShopSync eliminates the classic problem of two people grabbing the same item — or nobody grabbing one at all.
+
+## Why ShopSync
+
+When a group shops together (or splits up across store sections), coordination breaks down fast: someone doubles up on milk, nobody grabbed coffee, and half the group is waiting at checkout while the other half is still searching. Texting back and forth doesn't cut it.
+
+ShopSync gives everyone a **live shared list** where items can be claimed, tracked, and checked off in real time as the group moves through the store. Everyone sees the same state, instantly.
+
+## How it works
+
+1. **Register / Sign in** — create your account
+2. **New Trip** — give it a name and pick a store (Lidl, Action, etc.)
+3. **Invite your group** — share the 6-char invite code with teammates
+4. **Add items** — build the shopping list with qty, category, and notes
+5. **Claim items** — tap the circle to claim an item; it locks to you in real time for everyone else
+6. **Advance status** — as you shop: Claimed → Found → In Cart
+7. **Live presence** — see which group members are active in the store right now
+
+### Item lifecycle
+
+```
+unassigned  →  claimed  →  found  →  in_cart
+    ↑_______________↩ (unclaim)
+```
 
 ## Quick Start
 
@@ -9,30 +32,22 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Then open **http://localhost:5173**
-
-## How it works
-
-1. **Register / Sign in** — create your account
-2. **New Trip** — give it a name and pick a store (Lidl, Action, etc.)
-3. **Invite your group** — share the 6-char invite code from the ↑ button in the event
-4. **Add items** — type the shopping list (with qty, category, notes)
-5. **Claim items** — tap the circle to claim an item. It locks to you in real time for everyone else
-6. **Advance status** — as you shop: Claimed → Found → In Cart
-7. **Live presence** — see which group members are active in the store
+Open **http://localhost:5173**
 
 ## Architecture
 
 ```
-frontend/   React + TypeScript + Vite + Tailwind CSS
-backend/    Node.js + Express + Socket.io
+frontend/   React 18 + TypeScript + Vite + Tailwind CSS + Zustand
+backend/    Node.js + Express + TypeScript + Socket.IO
 database/   PostgreSQL 16
 ```
+
+All three services are wired together via Docker Compose with hot reload enabled for development. The app uses REST for state mutations and WebSockets for real-time broadcasting — after each database write, the backend emits a socket event to all members of that event room.
 
 ### Socket events
 
 | Direction | Event | Payload |
-|---|---|---|
+|-----------|-------|---------|
 | → Server | `join_event` | `{ eventId }` |
 | → Server | `leave_event` | `{ eventId }` |
 | ← Client | `item_added` | Item object |
@@ -40,22 +55,13 @@ database/   PostgreSQL 16
 | ← Client | `item_deleted` | `{ id, event_id }` |
 | ← Client | `presence_update` | `Member[]` |
 
-## Item lifecycle
-
-```
-unassigned  →  claimed  →  found  →  in_cart
-    ↑_______________↩ (unclaim)
-```
-
 ## Development without Docker
 
 ```bash
-# Start postgres separately, then:
-
 # Backend
 cd backend && npm install && npm run dev
 
-# Frontend
+# Frontend (separate terminal)
 cd frontend && npm install && npm run dev
 ```
 
