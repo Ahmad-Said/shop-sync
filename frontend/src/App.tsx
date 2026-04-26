@@ -3,7 +3,6 @@ import { useAuthStore } from './store/useAuthStore';
 import AuthPage from './pages/AuthPage';
 import HomePage from './pages/HomePage';
 import EventPage from './pages/EventPage';
-import OfflineBanner from './components/OfflineBanner';
 import { useBackgroundSync } from './hooks/useBackgroundSync';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -21,7 +20,6 @@ export default function App() {
 
   return (
     <>
-      <OfflineBanner />
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />

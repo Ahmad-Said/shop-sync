@@ -1,12 +1,13 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, UserPlus, Plus, Package,
-  CheckCircle2, ShoppingCart, Search, Circle, Store, MoreVertical, Pencil, Trash2
+  CheckCircle2, ShoppingCart, Search, Circle, Store, MoreVertical, Pencil, Trash2, WifiOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { eventsApi } from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
+import { useOfflineStore } from '../store/useOfflineStore';
 import { useSocket } from '../hooks/useSocket';
 import { EventDetail, Item, Member, ItemStatus } from '../types';
 import { getCachedEventDetail, putCachedEventDetail } from '../store/db';
@@ -35,6 +36,7 @@ export default function EventPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const isOnline = useOfflineStore((s) => s.isOnline);
 
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,11 +50,15 @@ export default function EventPage() {
   const [showEditTrip, setShowEditTrip] = useState(false);
   const [onlineMembers, setOnlineMembers] = useState<Member[]>([]);
 
+  const gotCacheRef = useRef(false);
+
   useEffect(() => {
     if (!id) return;
+    gotCacheRef.current = false;
     // Load cached data immediately so UI isn't blank offline
     getCachedEventDetail(id).then((cached) => {
       if (cached) {
+        gotCacheRef.current = true;
         setEvent(cached);
         setLoading(false);
       }
@@ -64,7 +70,7 @@ export default function EventPage() {
       })
       .catch(() => {
         if (!navigator.onLine) {
-          toast('Viewing cached data', { icon: '📶' });
+          // offline indicator in the header handles the hint; no toast needed
         } else {
           toast.error('Trip not found');
           navigate('/');
@@ -188,7 +194,25 @@ export default function EventPage() {
     );
   }
 
-  if (!event) return null;
+  if (!event) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-8 text-center max-w-lg mx-auto">
+        <WifiOff size={36} style={{ color: 'var(--muted)' }} />
+        <div>
+          <p className="font-display font-700 text-base mb-2">Not available offline</p>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>
+            Open this trip while connected to access it offline
+          </p>
+        </div>
+        <button
+          onClick={() => navigate('/')}
+          className="btn-neon px-5 py-2.5 rounded-xl text-sm font-display font-600"
+        >
+          Go back
+        </button>
+      </div>
+    );
+  }
 
   const groupByPerson = statusFilter === 'all' && personFilter === 'all' && showPersonFilter;
   const canManageTrip = event.creator_id === user?.id;
@@ -220,6 +244,15 @@ export default function EventPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {!isOnline && (
+              <div
+                className="p-2 rounded-xl"
+                style={{ background: 'var(--surface)', color: 'var(--amber)' }}
+                title="Offline"
+              >
+                <WifiOff size={15} />
+              </div>
+            )}
             <button
               onClick={() => setShowInvite(true)}
               className="p-2 rounded-xl transition-colors"

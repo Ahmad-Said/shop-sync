@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, LogIn, ShoppingCart, LogOut, Store, Users, Package, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { Plus, LogIn, ShoppingCart, LogOut, Store, Users, Package, MoreVertical, Pencil, Trash2, WifiOff, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { eventsApi } from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSocket } from '../hooks/useSocket';
+import { useOfflineStore } from '../store/useOfflineStore';
 import { Event } from '../types';
 import { getCachedEvents, putCachedEvents } from '../store/db';
 import CreateEventModal from '../components/CreateEventModal';
@@ -23,6 +24,8 @@ export default function HomePage() {
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { user, clearAuth } = useAuthStore();
+  const isOnline = useOfflineStore((s) => s.isOnline);
+  const isSyncing = useOfflineStore((s) => s.isSyncing);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,9 +43,7 @@ export default function HomePage() {
         putCachedEvents(r.data);
       })
       .catch(() => {
-        if (!navigator.onLine) {
-          toast('Viewing cached trips', { icon: '📶' });
-        } else {
+        if (navigator.onLine) {
           toast.error('Failed to load trips');
         }
       })
@@ -111,11 +112,25 @@ export default function HomePage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <div
-            className="avatar"
-            style={{ background: user?.avatar_color || '#00F5A0', width: 34, height: 34, fontSize: 12 }}
-          >
-            {user?.username?.slice(0, 2).toUpperCase()}
+          <div className="relative">
+            <div
+              className="avatar"
+              style={{ background: user?.avatar_color || '#00F5A0', width: 34, height: 34, fontSize: 12 }}
+            >
+              {user?.username?.slice(0, 2).toUpperCase()}
+            </div>
+            {!isOnline && (
+              <div
+                className="absolute -bottom-1 -right-1 rounded-full flex items-center justify-center"
+                style={{ width: 16, height: 16, background: '#0C0C0F', border: '1.5px solid var(--border)' }}
+                title={isSyncing ? 'Syncing…' : 'Offline'}
+              >
+                {isSyncing
+                  ? <RefreshCw size={9} style={{ color: 'var(--amber)' }} className="animate-spin" />
+                  : <WifiOff size={9} style={{ color: 'var(--amber)' }} />
+                }
+              </div>
+            )}
           </div>
           <button
             onClick={() => { clearAuth(); navigate('/auth'); }}
