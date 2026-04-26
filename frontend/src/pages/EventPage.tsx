@@ -9,6 +9,7 @@ import { eventsApi } from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSocket } from '../hooks/useSocket';
 import { EventDetail, Item, Member, ItemStatus } from '../types';
+import { getCachedEventDetail, putCachedEventDetail } from '../store/db';
 import ItemCard from '../components/ItemCard';
 import AddItemForm from '../components/AddItemForm';
 import MemberPresence from '../components/MemberPresence';
@@ -49,9 +50,26 @@ export default function EventPage() {
 
   useEffect(() => {
     if (!id) return;
+    // Load cached data immediately so UI isn't blank offline
+    getCachedEventDetail(id).then((cached) => {
+      if (cached) {
+        setEvent(cached);
+        setLoading(false);
+      }
+    });
     eventsApi.get(id)
-      .then((r) => setEvent(r.data))
-      .catch(() => { toast.error('Trip not found'); navigate('/'); })
+      .then((r) => {
+        setEvent(r.data);
+        putCachedEventDetail(r.data);
+      })
+      .catch(() => {
+        if (!navigator.onLine) {
+          toast('Viewing cached data', { icon: '📶' });
+        } else {
+          toast.error('Trip not found');
+          navigate('/');
+        }
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -60,19 +78,25 @@ export default function EventPage() {
       setEvent((prev) => {
         if (!prev) return prev;
         if (prev.items.find((i) => i.id === item.id)) return prev;
-        return { ...prev, items: [...prev.items, item] };
+        const updated = { ...prev, items: [...prev.items, item] };
+        putCachedEventDetail(updated);
+        return updated;
       });
     },
     onItemUpdated: (item) => {
       setEvent((prev) => {
         if (!prev) return prev;
-        return { ...prev, items: prev.items.map((i) => i.id === item.id ? item : i) };
+        const updated = { ...prev, items: prev.items.map((i) => i.id === item.id ? item : i) };
+        putCachedEventDetail(updated);
+        return updated;
       });
     },
     onItemDeleted: ({ id: itemId }) => {
       setEvent((prev) => {
         if (!prev) return prev;
-        return { ...prev, items: prev.items.filter((i) => i.id !== itemId) };
+        const updated = { ...prev, items: prev.items.filter((i) => i.id !== itemId) };
+        putCachedEventDetail(updated);
+        return updated;
       });
     },
     onPresenceUpdate: (members) => setOnlineMembers(members),

@@ -3,6 +3,8 @@ import { useAuthStore } from './store/useAuthStore';
 import AuthPage from './pages/AuthPage';
 import HomePage from './pages/HomePage';
 import EventPage from './pages/EventPage';
+import OfflineBanner from './components/OfflineBanner';
+import { useBackgroundSync } from './hooks/useBackgroundSync';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
@@ -15,14 +17,19 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  useBackgroundSync();
+
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
-        <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
-        <Route path="/events/:id" element={<PrivateRoute><EventPage /></PrivateRoute>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <>
+      <OfflineBanner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
+          <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
+          <Route path="/events/:id" element={<PrivateRoute><EventPage /></PrivateRoute>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </>
   );
 }

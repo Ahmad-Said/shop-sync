@@ -6,6 +6,7 @@ import { eventsApi } from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSocket } from '../hooks/useSocket';
 import { Event } from '../types';
+import { getCachedEvents, putCachedEvents } from '../store/db';
 import CreateEventModal from '../components/CreateEventModal';
 import JoinEventModal from '../components/JoinEventModal';
 import EditEventModal from '../components/EditEventModal';
@@ -25,9 +26,26 @@ export default function HomePage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Show cached data instantly
+    getCachedEvents().then((cached) => {
+      if (cached.length > 0) {
+        setEvents(cached);
+        setLoading(false);
+      }
+    });
+    // Then fetch fresh from network
     eventsApi.list()
-      .then((r) => setEvents(r.data))
-      .catch(() => toast.error('Failed to load trips'))
+      .then((r) => {
+        setEvents(r.data);
+        putCachedEvents(r.data);
+      })
+      .catch(() => {
+        if (!navigator.onLine) {
+          toast('Viewing cached trips', { icon: '📶' });
+        } else {
+          toast.error('Failed to load trips');
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 

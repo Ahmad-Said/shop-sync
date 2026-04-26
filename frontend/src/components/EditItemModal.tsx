@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pencil, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { itemsApi } from '../api/client';
+import { offlineUpdateItem } from '../api/offlineClient';
 import { Item } from '../types';
 import AppDialog from './ui/AppDialog';
 
@@ -27,14 +27,14 @@ export default function EditItemModal({ item, onUpdated, onClose }: Props) {
 
     setLoading(true);
     try {
-      const res = await itemsApi.update(item.id, {
+      const updated = await offlineUpdateItem(item, {
         name: name.trim(),
         quantity: parseInt(quantity, 10) || 1,
         unit: unit.trim() || undefined,
         category: category || undefined,
         notes: notes.trim() || undefined,
       });
-      onUpdated(res.data);
+      onUpdated(updated);
       toast.success('Item updated');
       onClose();
     } catch (err: any) {

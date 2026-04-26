@@ -24,6 +24,29 @@ export interface Item {
   status: ItemStatus;
   added_by: string;
   created_at: string;
+  /** Marks an optimistically-added item that hasn't been synced yet */
+  _pending?: boolean;
+  /** Temporary client-side ID used before server assigns a real one */
+  _tempId?: string;
+}
+
+export type OfflineActionType =
+  | 'ADD_ITEM'
+  | 'CLAIM_ITEM'
+  | 'UNCLAIM_ITEM'
+  | 'UPDATE_STATUS'
+  | 'UPDATE_REQUESTED_FOR'
+  | 'UPDATE_ITEM'
+  | 'DELETE_ITEM';
+
+export interface OfflineAction {
+  /** Auto-incremented by IndexedDB */
+  queueId?: number;
+  type: OfflineActionType;
+  /** The real item ID – or the _tempId for ADD_ITEM follow-ups */
+  itemId: string;
+  payload: Record<string, unknown>;
+  createdAt: number;
 }
 
 export interface Member {

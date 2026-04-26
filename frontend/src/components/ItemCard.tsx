@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { CheckCircle2, Circle, ShoppingCart, Search, Trash2, MoreVertical, User, ChevronDown, Pencil } from 'lucide-react';
+import { CheckCircle2, Circle, ShoppingCart, Search, Trash2, MoreVertical, User, ChevronDown, Pencil, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Item, ItemStatus, Member } from '../types';
-import { itemsApi } from '../api/client';
+import { offlineClaim, offlineUnclaim, offlineUpdateStatus, offlineUpdateRequestedFor, offlineDeleteItem } from '../api/offlineClient';
 import ConfirmModal from './ConfirmModal';
 import EditItemModal from './EditItemModal';
 
@@ -48,16 +48,16 @@ export default function ItemCard({ item, members, currentUserId, eventCreatorId,
   const isForMe = item.requested_for === currentUserId || (!item.requested_for && item.added_by === currentUserId);
 
   async function handleClaim() {
-    if (loading) return;
+    if (loading || item._pending) return;
     setLoading(true);
     try {
       if (isMyCartItem) {
-        const res = await itemsApi.unclaim(item.id);
-        onUpdated(res.data);
+        const updated = await offlineUnclaim(item);
+        onUpdated(updated);
         toast('Item released', { icon: '↩️' });
       } else {
-        const res = await itemsApi.claim(item.id);
-        onUpdated(res.data);
+        const updated = await offlineClaim(item);
+        onUpdated(updated);
         toast.success('Item claimed!');
       }
     } catch (err: any) {
@@ -68,14 +68,14 @@ export default function ItemCard({ item, members, currentUserId, eventCreatorId,
   }
 
   async function handleStatusAdvance() {
-    if (!isMyCartItem || loading) return;
+    if (!isMyCartItem || loading || item._pending) return;
     const currentIdx = STATUS_ORDER.indexOf(item.status);
     const next = STATUS_ORDER[Math.min(currentIdx + 1, STATUS_ORDER.length - 1)];
     if (next === item.status) return;
     setLoading(true);
     try {
-      const res = await itemsApi.updateStatus(item.id, next);
-      onUpdated(res.data);
+      const updated = await offlineUpdateStatus(item, next);
+      onUpdated(updated);
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed');
     } finally {
@@ -85,11 +85,11 @@ export default function ItemCard({ item, members, currentUserId, eventCreatorId,
 
   async function handleReassign(memberId: string) {
     setShowForMenu(false);
-    if (memberId === item.requested_for) return;
+    if (memberId === item.requested_for || item._pending) return;
     setLoading(true);
     try {
-      const res = await itemsApi.updateRequestedFor(item.id, memberId);
-      onUpdated(res.data);
+      const updated = await offlineUpdateRequestedFor(item, memberId);
+      onUpdated(updated);
       toast.success('Reassigned');
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed');
@@ -103,7 +103,7 @@ export default function ItemCard({ item, members, currentUserId, eventCreatorId,
   async function handleDelete() {
     setLoading(true);
     try {
-      await itemsApi.delete(item.id);
+      await offlineDeleteItem(item);
       onDeleted(item.id);
       toast('Item removed');
     } catch (err: any) {
@@ -165,6 +165,16 @@ export default function ItemCard({ item, members, currentUserId, eventCreatorId,
                 {item.quantity > 1 && (
                   <span className="ml-2 font-mono text-xs" style={{ color: 'var(--muted)' }}>
                     ×{item.quantity}{item.unit ? ` ${item.unit}` : ''}
+                  </span>
+                )}
+                {item._pending && (
+                  <span
+                    className="ml-2 inline-flex items-center gap-0.5 text-xs font-display font-600 px-1.5 py-0.5 rounded-full"
+                    style={{ background: 'rgba(245,158,11,0.15)', color: '#F59E0B', verticalAlign: 'middle' }}
+                    title="Pending sync"
+                  >
+                    <Clock size={9} />
+                    pending
                   </span>
                 )}
               </p>

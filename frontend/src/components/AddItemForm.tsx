@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { itemsApi } from '../api/client';
+import { offlineAddItem } from '../api/offlineClient';
 import { Item, Member } from '../types';
+import { useAuthStore } from '../store/useAuthStore';
 
 const CATEGORIES = ['Produce', 'Dairy', 'Meat', 'Bakery', 'Frozen', 'Beverages', 'Snacks', 'Cleaning', 'Personal Care', 'Other'];
 
@@ -23,6 +24,7 @@ export default function AddItemForm({ eventId, members, currentUserId, onAdded, 
   const [requestedFor, setRequestedFor] = useState(currentUserId);
   const [loading, setLoading] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuthStore();
 
   useEffect(() => {
     nameRef.current?.focus();
@@ -33,16 +35,20 @@ export default function AddItemForm({ eventId, members, currentUserId, onAdded, 
     if (!name.trim()) return;
     setLoading(true);
     try {
-      const res = await itemsApi.add({
-        event_id: eventId,
-        name: name.trim(),
-        quantity: parseInt(quantity) || 1,
-        unit: unit.trim() || undefined,
-        category: category || undefined,
-        notes: notes.trim() || undefined,
-        requested_for: requestedFor,
-      });
-      onAdded(res.data);
+      const item = await offlineAddItem(
+        {
+          event_id: eventId,
+          name: name.trim(),
+          quantity: parseInt(quantity) || 1,
+          unit: unit.trim() || undefined,
+          category: category || undefined,
+          notes: notes.trim() || undefined,
+          requested_for: requestedFor,
+        },
+        user!,
+      );
+      onAdded(item);
+      if (item._pending) toast('Added offline — will sync when reconnected', { icon: '📶' });
       setName('');
       setQuantity('1');
       setUnit('');
