@@ -30,24 +30,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - ./backend/src:/app/src
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    environment:
-      API_PROXY_TARGET: http://host.docker.internal:${BACKEND_PORT:-3001}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
+      - "${FRONTEND_PORT:-5173}:80"
     depends_on:
       - backend
-    volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/index.html:/app/index.html
 
 volumes:
   postgres_data:
